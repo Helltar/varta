@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Test and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+
+      - name: Set up Java
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      - name: Test and build JAR
+        run: ./gradlew check shadowJar
+
+      - name: Build Docker image
+        run: docker build --tag varta:ci .
+
+      - name: Start Docker image
+        id: container
+        run: |
+          docker run --detach --name varta-ci \
+            --group-add "$(stat -c '%g' /var/run/docker.sock)" \
+            --volume /var/run/docker.sock:/var/run/docker.sock:ro \
+            --env BOT_TOKEN=000:invalid \
+            --env CHAT_ID=1 \
+            --env POLL_INTERVAL_SECONDS=1 \
+            --env SETTLE_TIMEOUT_SECONDS=3 \
+            --health-interval=1s \
+            --health-start-period=1s \
+            --health-retries=10 \
+            varta:ci
+
+      - name: Wait for healthy container
+        run: |
+          for attempt in {1..30}; do
+            health="$(docker inspect --format '{{.State.Health.Status}}' varta-ci)"
+            state="$(docker inspect --format '{{.State.Status}}' varta-ci)"
+
+            if [[ "$health" == healthy ]]; then
+              exit 0
+            fi
+
+            if [[ "$health" == unhealthy || "$state" == exited ]]; then
+              exit 1
+            fi
+
+            sleep 1
+          done
+
+          exit 1
+
+      - name: Show container logs
+        if: failure() && steps.container.outcome == 'success'
+        run: docker logs varta-ci
+
+      - name: Remove container
+        if: always() && steps.container.outcome == 'success'
+        run: docker rm --force varta-ci
