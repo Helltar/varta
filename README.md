@@ -1,0 +1,70 @@
+# Varta
+
+Did the stack come back up? Varta answers that in Telegram — once, after a reboot, without being
+asked. Then it goes quiet, reporting later problems and recoveries without narrating ordinary
+restarts.
+
+```text
+✅ 3 healthy · ⚪ 1 unverified
+
+my-stack
+
+✅ aibot
+✅ postgres
+✅ varta
+⚪ nginx — no healthcheck
+
+1 service has no healthcheck — it is unverified, not confirmed.
+```
+
+See [how Varta works](docs/how-it-works.md) for the exact report behavior, status meanings and Docker
+socket access.
+
+## Run it
+
+Varta is made for a Linux host running Docker Engine API 1.44 or newer. It needs a Telegram bot and
+read access to the Docker socket.
+
+Create a bot for Varta with `@BotFather`, then send it `/start`.
+
+Clone the repository and create the local configuration:
+
+```bash
+git clone https://github.com/Helltar/varta.git
+cd varta
+cp .env.example .env
+```
+
+On the server where Varta will run, get the Docker socket's group id:
+
+```bash
+stat -c '%g' /var/run/docker.sock
+```
+
+Put the result in `DOCKER_GID` in `.env`, together with `BOT_TOKEN` and `CHAT_ID`.
+
+Then start Varta and check its log:
+
+```bash
+docker compose up -d
+docker compose logs varta
+```
+
+The boot report should arrive in Telegram. If Telegram rejects it, the complete undelivered report is
+kept in the log and retried automatically.
+
+Already have a Compose stack? Copy the `varta` service from [compose.yaml](compose.yaml) into it. This
+also keeps Varta grouped with the rest of that stack in its own reports.
+
+All user-facing configuration is described in [.env.example](.env.example). Nothing is installed
+inside the watched containers, and nothing about them changes.
+
+## Build from source
+
+```bash
+# container image
+docker build -t varta .
+
+# fat jar -> build/libs/
+./gradlew shadowJar
+```

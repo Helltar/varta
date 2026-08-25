@@ -1,0 +1,14 @@
+services:
+
+  varta:
+    container_name: varta-container
+    image: ghcr.io/helltar/varta:latest
+    restart: unless-stopped
+    env_file: .env
+    # read-only: Varta only ever reads container state, it never acts on the daemon
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    # the gid of the host's docker group, so the container can read the socket without running as root
+    # find it with: stat -c '%g' /var/run/docker.sock
+    group_add:
+      - "${DOCKER_GID:?set DOCKER_GID in .env — see the comment above}"
