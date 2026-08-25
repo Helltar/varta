@@ -4,6 +4,8 @@ Did the stack come back up? Varta answers that in Telegram — once, after a reb
 asked. Then it goes quiet, reporting later problems and recoveries without narrating ordinary
 restarts.
 
+A boot report in Telegram looks like this:
+
 ```text
 ✅ 3 healthy · ⚪ 1 unverified
 
