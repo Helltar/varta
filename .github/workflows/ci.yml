@@ -40,10 +40,48 @@ jobs:
           cache-provider: basic
 
       - name: Test and build JAR
-        run: ./gradlew check shadowJar
+        run: |
+          set -o pipefail
+
+          for attempt in 1 2 3; do
+            if ./gradlew check shadowJar 2>&1 | tee gradle-build.log; then
+              exit 0
+            fi
+
+            if ! grep -Eq '429.*Too Many Requests' gradle-build.log || [[ "$attempt" == 3 ]]; then
+              exit 1
+            fi
+
+            sleep $((attempt * 10))
+          done
 
       - name: Build Docker image
-        run: docker build --tag varta:ci .
+        run: |
+          set -o pipefail
+
+          for attempt in 1 2 3; do
+            if docker build --tag varta:ci . 2>&1 | tee docker-build.log; then
+              exit 0
+            fi
+
+            if ! grep -Eq '429.*Too Many Requests' docker-build.log || [[ "$attempt" == 3 ]]; then
+              exit 1
+            fi
+
+            sleep $((attempt * 10))
+          done
+
+      - name: Start healthy fixture
+        run: |
+          docker run --detach --name varta-ci-fixture \
+            --label com.docker.compose.project=varta-ci \
+            --label com.docker.compose.service=fixture \
+            --health-cmd 'exit 0' \
+            --health-interval=1s \
+            --health-start-period=10s \
+            --health-start-interval=1s \
+            --entrypoint sleep \
+            varta:ci 5m
 
       - name: Start Docker image
         id: container
@@ -51,26 +89,36 @@ jobs:
           docker run --detach --name varta-ci \
             --group-add "$(stat -c '%g' /var/run/docker.sock)" \
             --volume /var/run/docker.sock:/var/run/docker.sock:ro \
+            --label com.docker.compose.project=varta-ci \
+            --label com.docker.compose.service=varta \
             --env BOT_TOKEN=000:invalid \
             --env CHAT_ID=1 \
+            --env PROJECTS=varta-ci \
             --env POLL_INTERVAL_SECONDS=1 \
-            --env SETTLE_TIMEOUT_SECONDS=3 \
+            --env SETTLE_TIMEOUT_SECONDS=10 \
             --health-interval=1s \
-            --health-start-period=1s \
+            --health-start-period=10s \
+            --health-start-interval=1s \
             --health-retries=10 \
             varta:ci
 
-      - name: Wait for healthy container
+      - name: Verify Docker health and Varta report
         run: |
           for attempt in {1..30}; do
-            health="$(docker inspect --format '{{.State.Health.Status}}' varta-ci)"
-            state="$(docker inspect --format '{{.State.Status}}' varta-ci)"
+            varta_health="$(docker inspect --format '{{.State.Health.Status}}' varta-ci)"
+            varta_state="$(docker inspect --format '{{.State.Status}}' varta-ci)"
+            fixture_health="$(docker inspect --format '{{.State.Health.Status}}' varta-ci-fixture)"
+            fixture_state="$(docker inspect --format '{{.State.Status}}' varta-ci-fixture)"
+            logs="$(docker logs varta-ci 2>&1)"
 
-            if [[ "$health" == healthy ]]; then
+            if [[ "$varta_health" == healthy && "$fixture_health" == healthy ]] && \
+                grep -Fq 'All 2 healthy' <<< "$logs"; then
               exit 0
             fi
 
-            if [[ "$health" == unhealthy || "$state" == exited ]]; then
+            if [[ "$varta_health" == unhealthy || "$varta_state" == exited || \
+                  "$fixture_health" == unhealthy || "$fixture_state" == exited ]] || \
+                grep -Fq 'unverified' <<< "$logs"; then
               exit 1
             fi
 
@@ -83,6 +131,6 @@ jobs:
         if: failure() && steps.container.outcome == 'success'
         run: docker logs varta-ci
 
-      - name: Remove container
-        if: always() && steps.container.outcome == 'success'
-        run: docker rm --force varta-ci
+      - name: Remove containers
+        if: always()
+        run: docker rm --force varta-ci varta-ci-fixture || true

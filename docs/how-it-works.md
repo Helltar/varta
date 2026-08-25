@@ -83,8 +83,9 @@ The full list of settings and defaults is in [.env.example](../.env.example).
 
 ## Docker socket access
 
-Varta requires Docker Engine API 1.44 or newer. It mounts `/var/run/docker.sock` read-only and only
-sends `GET /v1.44/containers/json?all=true`; it never changes anything through the daemon. The `:ro`
+Varta supports Docker Engine API 1.24–1.55 and negotiates the highest version supported by both sides.
+It lists the stack once, then inspects each watched running container for its authoritative health
+state. Every request is a `GET`; Varta never changes anything through the daemon. The `:ro`
 mount prevents changes to the socket file itself, but it does not make the Docker API read-only.
 Treat access to the socket as root-level access to the host.
 

@@ -8,23 +8,29 @@ private const val COMPOSE_SERVICE_LABEL = "com.docker.compose.service"
 private const val COMPOSE_ONEOFF_LABEL = "com.docker.compose.oneoff"
 
 /**
- * What one container looks like in `GET /v1.44/containers/json`.
- *
- * Since API 1.44 the list itself carries `Health`, so the whole stack's state arrives in a single
- * request; the per-container endpoint is only needed for details worth fetching when something is
- * already wrong.
+ * What one container looks like in `GET /containers/json`.
  */
 @Serializable
 internal data class ContainerSummary(
+    @SerialName("Id") val id: String = "",
     @SerialName("Names") val names: List<String> = emptyList(),
     @SerialName("State") val state: String = "",
     @SerialName("Status") val status: String = "",
-    @SerialName("Health") val health: ContainerHealth? = null,
     @SerialName("Labels") val labels: Map<String, String> = emptyMap()
 )
 
 @Serializable
 internal data class ContainerHealth(@SerialName("Status") val status: String = "")
+
+@Serializable
+internal data class ContainerDetails(
+    @SerialName("State") val state: ContainerRuntimeState = ContainerRuntimeState()
+)
+
+@Serializable
+internal data class ContainerRuntimeState(
+    @SerialName("Health") val health: ContainerHealth? = null
+)
 
 /**
  * The states a service can be reported in.
@@ -66,13 +72,13 @@ internal data class Service(
  */
 internal fun ContainerSummary.isOneOff() = labels[COMPOSE_ONEOFF_LABEL].equals("True", ignoreCase = true)
 
-internal fun ContainerSummary.toService(): Service {
+internal fun ContainerSummary.toService(health: ContainerHealth? = null): Service {
     val containerName = names.firstOrNull()?.removePrefix("/").orEmpty()
 
     return Service(
         project = labels[COMPOSE_PROJECT_LABEL],
         name = labels[COMPOSE_SERVICE_LABEL] ?: containerName,
-        state = resolveState(),
+        state = resolveState(health),
         status = status,
         containerName = containerName
     )
@@ -87,7 +93,7 @@ internal fun List<Service>.withDistinctDisplayNames(): List<Service> {
     }
 }
 
-private fun ContainerSummary.resolveState() =
+private fun ContainerSummary.resolveState(health: ContainerHealth?) =
     when {
         state.equals("restarting", ignoreCase = true) -> ServiceState.RESTARTING
         !state.equals("running", ignoreCase = true) -> ServiceState.STOPPED

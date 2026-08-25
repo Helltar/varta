@@ -7,27 +7,27 @@ class ServicesTest {
 
     @Test
     fun `a running container with a passing healthcheck is healthy`() {
-        assertEquals(ServiceState.HEALTHY, summary(state = "running", health = "healthy").toService().state)
+        assertEquals(ServiceState.HEALTHY, summary("running").service("healthy").state)
     }
 
     @Test
     fun `a running container without a healthcheck is unmeasured, not healthy`() {
-        assertEquals(ServiceState.UNMEASURED, summary(state = "running", health = null).toService().state)
+        assertEquals(ServiceState.UNMEASURED, summary("running").service(null).state)
     }
 
     @Test
     fun `podman reports no healthcheck as none`() {
-        assertEquals(ServiceState.UNMEASURED, summary(state = "running", health = "none").toService().state)
+        assertEquals(ServiceState.UNMEASURED, summary("running").service("none").state)
     }
 
     @Test
     fun `a failing healthcheck is unhealthy`() {
-        assertEquals(ServiceState.UNHEALTHY, summary(state = "running", health = "unhealthy").toService().state)
+        assertEquals(ServiceState.UNHEALTHY, summary("running").service("unhealthy").state)
     }
 
     @Test
     fun `a container still inside its start period is passing through, not settled`() {
-        val state = summary(state = "running", health = "starting").toService().state
+        val state = summary("running").service("starting").state
 
         assertEquals(ServiceState.STARTING, state)
         assertEquals(false, state.settled)
@@ -35,7 +35,7 @@ class ServicesTest {
 
     @Test
     fun `restarting outranks the health it last reported`() {
-        val state = summary(state = "restarting", health = "healthy").toService().state
+        val state = summary("restarting").service("healthy").state
 
         assertEquals(ServiceState.RESTARTING, state)
         assertEquals(false, state.settled)
@@ -43,13 +43,13 @@ class ServicesTest {
 
     @Test
     fun `anything not running is stopped`() {
-        assertEquals(ServiceState.STOPPED, summary(state = "exited", health = null).toService().state)
+        assertEquals(ServiceState.STOPPED, summary("exited").service(null).state)
     }
 
     @Test
     fun `compose labels name the service and its project`() {
         val service =
-            summary(state = "running", health = "healthy")
+            summary("running")
                 .copy(
                     names = listOf("/aibot-container"),
                     labels = mapOf(
@@ -57,7 +57,7 @@ class ServicesTest {
                         "com.docker.compose.service" to "aibot"
                     )
                 )
-                .toService()
+                .service("healthy")
 
         assertEquals("netcup", service.project)
         assertEquals("aibot", service.name)
@@ -66,7 +66,7 @@ class ServicesTest {
 
     @Test
     fun `a container outside compose falls back to its own name`() {
-        val service = summary(state = "running", health = null).copy(names = listOf("/lonely")).toService()
+        val service = summary("running").copy(names = listOf("/lonely")).service(null)
 
         assertEquals(null, service.project)
         assertEquals("lonely", service.name)
@@ -74,11 +74,11 @@ class ServicesTest {
 
     @Test
     fun `a one-off container from compose run is recognised so it can be left out`() {
-        val oneOff = summary(state = "exited", health = null)
+        val oneOff = summary("exited")
             .copy(labels = mapOf("com.docker.compose.oneoff" to "True"))
 
         assertEquals(true, oneOff.isOneOff())
-        assertEquals(false, summary(state = "running", health = "healthy").isOneOff())
+        assertEquals(false, summary("running").isOneOff())
     }
 
     @Test
@@ -92,11 +92,13 @@ class ServicesTest {
         assertEquals(listOf("bot (stack-bot-1)", "bot (stack-bot-2)"), replicas.map { it.name })
     }
 
-    private fun summary(state: String, health: String?) =
+    private fun summary(state: String) =
         ContainerSummary(
+            id = "container-id",
             names = listOf("/whatever"),
             state = state,
-            status = "Up 2 minutes",
-            health = health?.let { ContainerHealth(it) }
+            status = "Up 2 minutes"
         )
+
+    private fun ContainerSummary.service(health: String?) = toService(health?.let(::ContainerHealth))
 }

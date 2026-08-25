@@ -18,7 +18,7 @@ fun main() {
         runCatching { docker.services() }
             .getOrElse {
                 log.error(it) {
-                    "Cannot read Docker at [$socket] — check the socket mount, permissions, and API 1.44 support"
+                    "Cannot read Docker at [$socket] — check the socket mount, permissions, and API compatibility"
                 }
                 exitProcess(1)
             }
