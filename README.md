@@ -1,4 +1,8 @@
-# Varta
+<p align="center">
+  <img src="https://helltar.com/projects/varta/varta-avatar-rounded.png" width="128" alt="varta-avatar-rounded">
+</p>
+
+<h1 align="center">Varta</h1>
 
 Did the stack come back up? Varta answers that in Telegram — once, after a reboot, without being
 asked. Then it goes quiet, reporting later problems and recoveries without narrating ordinary
