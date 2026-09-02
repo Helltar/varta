@@ -182,6 +182,61 @@ class ReportTest {
         assertTrue(changeReports(listOf(StateChange(service, ServiceState.HEALTHY))).single().length <= 4000)
     }
 
+    @Test
+    fun `a host label names the machine a report came from`() {
+        val report = bootReport(listOf(service("aibot")), settled = true, host = "maia")
+
+        assertContains(report, "<b>maia</b>")
+        assertContains(report, "All 1 healthy")
+    }
+
+    @Test
+    fun `without a host label the report is unchanged`() {
+        val services = listOf(service("aibot"), service("vusan"))
+
+        assertEquals(bootReport(services, settled = true), bootReport(services, settled = true, host = null))
+    }
+
+    @Test
+    fun `a blank host label is treated as no label`() {
+        val services = listOf(service("aibot"))
+
+        assertEquals(bootReport(services, settled = true), bootReport(services, settled = true, host = "   "))
+    }
+
+    @Test
+    fun `an empty stack still says which host it is`() {
+        assertContains(bootReport(emptyList(), settled = true, host = "maia"), "<b>maia</b>")
+    }
+
+    @Test
+    fun `markup in a host label cannot break the message`() {
+        assertContains(bootReport(listOf(service("aibot")), settled = true, host = "<b>evil"), "&lt;b&gt;evil")
+    }
+
+    @Test
+    fun `every change message carries the host, not only the first`() {
+        val changes =
+            (1..400).map { number ->
+                StateChange(service("service-$number", ServiceState.UNHEALTHY), ServiceState.HEALTHY)
+            }
+
+        val reports = changeReports(changes, host = "maia")
+
+        assertTrue(reports.size > 1)
+        assertTrue(reports.all { it.contains("<b>maia</b>") })
+    }
+
+    @Test
+    fun `a labelled change report still fits the telegram limit`() {
+        val changes =
+            (1..400).map { number ->
+                StateChange(service("service-$number", ServiceState.UNHEALTHY), ServiceState.HEALTHY)
+            }
+
+        assertTrue(changeReports(changes, host = "a".repeat(200)).all { it.length <= 4000 })
+    }
+
     private fun service(
         name: String,
         state: ServiceState = ServiceState.HEALTHY,

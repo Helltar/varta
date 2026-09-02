@@ -13,6 +13,10 @@ object Config {
 
     val dockerSocket = readEnv("DOCKER_SOCKET", "/var/run/docker.sock")
 
+    // which machine a report came from. left unset, the daemon's own host name is used instead, so
+    // watching a second host needs no configuration at all
+    val hostLabel = readEnvOrNull("HOST_LABEL")
+
     // varta is the one container nobody else vouches for, so it leaves the same kind of trace it
     // looks for in others: a file whose age its own healthcheck reads
     val heartbeatFile = readEnv("HEARTBEAT_FILE", "/tmp/health")

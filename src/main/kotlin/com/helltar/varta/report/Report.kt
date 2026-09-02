@@ -18,9 +18,9 @@ internal data class StateChange(
  * The message sent once the stack has settled after a boot or a deploy — the roll call that replaces
  * reading logs and messaging each bot by hand.
  */
-internal fun bootReport(services: List<Service>, settled: Boolean): String {
+internal fun bootReport(services: List<Service>, settled: Boolean, host: String? = null): String {
     if (services.isEmpty()) {
-        return "⚠️ <b>No containers to watch</b>\nCheck <code>PROJECTS</code> and <code>IGNORE</code>."
+        return hostLine(host) + "⚠️ <b>No containers to watch</b>\nCheck <code>PROJECTS</code> and <code>IGNORE</code>."
     }
 
     val wrong = services.filter { it.state.wrong }
@@ -28,7 +28,7 @@ internal fun bootReport(services: List<Service>, settled: Boolean): String {
     val unmeasured = services.count { it.state == ServiceState.UNMEASURED }
 
     val header =
-        when {
+        hostLine(host) + when {
             !settled -> "⏳ <b>Still starting</b> — reporting anyway, ${services.size} watched"
             wrong.isNotEmpty() -> {
                 val verb = if (wrong.size == 1) "needs" else "need"
@@ -53,7 +53,7 @@ internal fun bootReport(services: List<Service>, settled: Boolean): String {
 }
 
 /** The messages sent when services move between settled states while varta is watching. */
-internal fun changeReports(changes: List<StateChange>): List<String> {
+internal fun changeReports(changes: List<StateChange>, host: String? = null): List<String> {
     val entries = changes.map { (service, from) ->
         "${service.state.glyph} <b>${service.name.forMessage().escapeHtml()}</b> — ${verb(from, service.state)}" +
                 "\n<i>${service.status.forMessage().escapeHtml()}</i>"
@@ -61,13 +61,18 @@ internal fun changeReports(changes: List<StateChange>): List<String> {
 
     if (entries.isEmpty()) return emptyList()
 
+    // the label goes on every message, not only the first: they arrive hours apart and out of any
+    // context. it is charged against the budget so a labelled message cannot overflow.
+    val prefix = hostLine(host)
+    val budget = MAX_MESSAGE_CHARS - prefix.length
+
     val reports = mutableListOf<String>()
     var current = entries.first()
 
     for (entry in entries.drop(1)) {
         val combined = "$current\n$entry"
 
-        if (combined.length <= MAX_MESSAGE_CHARS) current = combined
+        if (combined.length <= budget) current = combined
         else {
             reports += current
             current = entry
@@ -75,8 +80,15 @@ internal fun changeReports(changes: List<StateChange>): List<String> {
     }
 
     reports += current
-    return reports
+    return reports.map { prefix + it }
 }
+
+// which machine the report is about. two hosts running the same stack produce messages that are
+// otherwise identical, down to the compose project name.
+private fun hostLine(host: String?) =
+    host?.takeIf { it.isNotBlank() }
+        ?.let { "\uD83D\uDDA5 <b>${it.forMessage().escapeHtml()}</b>\n" }
+        .orEmpty()
 
 private fun verb(from: ServiceState?, to: ServiceState) =
     when (to) {

@@ -9,6 +9,11 @@ private val MIN_SUPPORTED_API_VERSION = DockerApiVersion(1, 24)
 private val MAX_SUPPORTED_API_VERSION = DockerApiVersion(1, 55)
 
 @Serializable
+internal data class DockerInfo(
+    @SerialName("Name") val name: String = ""
+)
+
+@Serializable
 internal data class DockerVersionInfo(
     @SerialName("ApiVersion") val apiVersion: String = "",
     @SerialName("MinAPIVersion") val minApiVersion: String = "1.24"
@@ -66,6 +71,14 @@ internal class Docker(socket: Path, private val projects: Set<String>, private v
     private val apiVersion by lazy {
         json.decodeFromString<DockerVersionInfo>(api.get("/version")).negotiateApiVersion()
     }
+
+    /**
+     * The name of the machine the daemon runs on.
+     *
+     * Deliberately not the container's own hostname: inside a container that is the container id,
+     * which says nothing about which host a report came from.
+     */
+    fun hostname() = json.decodeFromString<DockerInfo>(get("/info")).name.takeIf { it.isNotBlank() }
 
     fun services(): List<Service> {
         val summaries =

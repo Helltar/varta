@@ -13,6 +13,7 @@ import java.nio.file.Path
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 import kotlin.concurrent.thread
+import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertContains
 import kotlin.test.assertEquals
@@ -83,6 +84,14 @@ class DockerApiTest {
             assertContains(received[1], "GET /v1.44/containers/json?all=true HTTP/1.1")
             assertContains(received[2], "GET /v1.44/containers/abc/json HTTP/1.1")
         }
+    }
+
+    @Test
+    fun `the daemon's host name is read from the Name field of docker info`() {
+        val json = Json { ignoreUnknownKeys = true }
+
+        assertEquals("maia", json.decodeFromString<DockerInfo>("""{"Name":"maia","NCPU":1}""").name)
+        assertEquals("", json.decodeFromString<DockerInfo>("""{"NCPU":1}""").name)
     }
 
     @Test

@@ -23,8 +23,17 @@ fun main() {
                 exitProcess(1)
             }
 
+    // an unreadable host name is cosmetic, unlike an unreadable socket: report unlabelled rather
+    // than refusing to start
+    val host =
+        Config.hostLabel
+            ?: runCatching { docker.hostname() }
+                .onFailure { log.warn(it) { "Could not read the host name from Docker, reports will be unlabelled" } }
+                .getOrNull()
+
     log.info {
         "Watching ${watched.size} services" +
+                host?.let { " on [$it]" }.orEmpty() +
                 Config.projects.takeIf { it.isNotEmpty() }?.let { " in projects=[${it.joinToString()}]" }.orEmpty() +
                 ", settle timeout=${Config.settleTimeout}, poll every ${Config.pollInterval}"
     }
@@ -34,6 +43,7 @@ fun main() {
         telegram = Telegram(Config.botToken, Config.chatId),
         settleTimeout = Config.settleTimeout,
         pollInterval = Config.pollInterval,
-        heartbeatFile = Path.of(Config.heartbeatFile)
+        heartbeatFile = Path.of(Config.heartbeatFile),
+        host = host
     ).run()
 }

@@ -100,7 +100,8 @@ internal class Watcher(
     private val telegram: Telegram,
     private val settleTimeout: Duration,
     private val pollInterval: Duration,
-    private val heartbeatFile: Path
+    private val heartbeatFile: Path,
+    private val host: String? = null
 ) {
 
     fun run() {
@@ -108,7 +109,7 @@ internal class Watcher(
         val delivery = ReportDeliveryQueue(::deliver, pollInterval)
 
         log.info { "Reporting on ${snapshot.services.size} services, settled=${snapshot.settled}" }
-        delivery.enqueue(listOf(bootReport(snapshot.services, snapshot.settled)))
+        delivery.enqueue(listOf(bootReport(snapshot.services, snapshot.settled, host)))
         delivery.flushIfDue()
 
         watch(
@@ -167,7 +168,7 @@ internal class Watcher(
                                 changes.joinToString { "${it.service.name} ${it.from ?: "NEW"}->${it.service.state}" }
                     }
 
-                    delivery.enqueue(changeReports(changes))
+                    delivery.enqueue(changeReports(changes, host))
                 }
             }
 

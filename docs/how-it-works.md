@@ -81,6 +81,19 @@ otherwise remain in the report as broken containers.
 
 The full list of settings and defaults is in [.env.example](../.env.example).
 
+## Which host a report came from
+
+Every message carries the name of the machine it describes. Watching a second host is otherwise a
+trap: two hosts running the same Compose project send reports that are identical down to the
+project heading, arriving hours apart with no context.
+
+`HOST_LABEL` sets the name. Left unset, Varta asks the daemon for it (`GET /info`, field `Name`),
+so a second host usually needs no configuration at all. Deliberately *not* the container's own
+hostname — inside a container that is the container id, which names nothing useful.
+
+If the daemon cannot be asked, reports go out unlabelled rather than not at all: an unknown host
+name is cosmetic, unlike an unreadable socket, which stops Varta at startup.
+
 ## Docker socket access
 
 Varta supports Docker Engine API 1.24–1.55 and negotiates the highest version supported by both sides.
