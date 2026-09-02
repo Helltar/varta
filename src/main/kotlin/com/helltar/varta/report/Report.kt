@@ -87,7 +87,7 @@ internal fun changeReports(changes: List<StateChange>, host: String? = null): Li
 // otherwise identical, down to the compose project name.
 private fun hostLine(host: String?) =
     host?.takeIf { it.isNotBlank() }
-        ?.let { "\uD83D\uDDA5 <b>${it.forMessage().escapeHtml()}</b>\n" }
+        ?.let { "\uD83D\uDDA5 <b>${it.forMessage().escapeHtml()}</b>\n\n" }
         .orEmpty()
 
 private fun verb(from: ServiceState?, to: ServiceState) =

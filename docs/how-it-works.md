@@ -6,6 +6,8 @@ restarting. It sends one boot report, then polls quietly and reports only settle
 ## Boot report
 
 ```text
+🖥 atlas
+
 ✅ 6 healthy · ⚪ 2 unverified
 
 my-stack
@@ -59,6 +61,8 @@ as later state changes.
 After the boot report, Varta sends a message when a watched service moves between settled states:
 
 ```text
+🖥 atlas
+
 ❌ dlpbot — unhealthy
 Up 3 hours (unhealthy)
 ```

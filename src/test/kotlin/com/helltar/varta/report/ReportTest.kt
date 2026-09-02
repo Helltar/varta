@@ -191,6 +191,15 @@ class ReportTest {
     }
 
     @Test
+    fun `a blank line separates the host from the report it heads`() {
+        val boot = bootReport(listOf(service("aibot")), settled = true, host = "maia")
+        val change = changeReports(listOf(StateChange(service("aibot", ServiceState.STOPPED), null)), host = "maia")
+
+        assertContains(boot, "<b>maia</b>\n\n✅")
+        assertContains(change.single(), "<b>maia</b>\n\n")
+    }
+
+    @Test
     fun `without a host label the report is unchanged`() {
         val services = listOf(service("aibot"), service("vusan"))
 
