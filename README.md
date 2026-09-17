@@ -35,15 +35,16 @@ daemon (currently 1.24–1.55), and needs a Telegram bot and read access to the 
 
 Create a bot for Varta with `@BotFather`, then send it `/start`.
 
-Clone the repository and create the local configuration:
+On the server where Varta will run, fetch the two files it needs — there is nothing to clone or
+build, the image is published:
 
 ```bash
-git clone https://github.com/Helltar/varta.git
-cd varta
-cp .env.example .env
+mkdir varta && cd varta && curl -fsSLO \
+  "https://github.com/Helltar/varta/raw/master/{compose.yaml,.env.example}" && \
+  mv .env.example .env
 ```
 
-On the server where Varta will run, get the Docker socket's group id:
+Get the Docker socket's group id:
 
 ```bash
 stat -c '%g' /var/run/docker.sock
