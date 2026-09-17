@@ -155,6 +155,13 @@ class ReportTest {
     }
 
     @Test
+    fun `a service without a healthcheck coming back is said to be running again`() {
+        val back = StateChange(service("nginx", ServiceState.UNMEASURED, "Up 18 seconds"), from = ServiceState.CRASH_LOOPING)
+
+        assertContains(changeReports(listOf(back)).single(), "running again, no healthcheck")
+    }
+
+    @Test
     fun `a crash loop counts as needing attention in the boot report`() {
         val services = listOf(service("aibot"), service("vusan", ServiceState.CRASH_LOOPING, "restarted 9 times in 6m"))
         val report = bootReport(services, settled = true)
