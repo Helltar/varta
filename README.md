@@ -35,8 +35,7 @@ daemon (currently 1.24–1.55), and needs a Telegram bot and read access to the 
 
 Create a bot for Varta with `@BotFather`, then send it `/start`.
 
-On the server where Varta will run, fetch the two files it needs — there is nothing to clone or
-build, the image is published:
+On the server where Varta will run:
 
 ```bash
 mkdir varta && cd varta && curl -fsSLO \
@@ -70,17 +69,12 @@ inside the watched containers, and nothing about them changes.
 
 ## Build from source
 
-Only needed to change Varta or to run an image of your own; running it takes none of this.
-
 ```bash
 git clone https://github.com/Helltar/varta.git && cd varta
 
-# container image; to run it, point `image:` in compose.yaml at `varta`
+# container image
 docker build -t varta .
 
-# or a fat jar in build/libs/, which needs JDK 21 to build and to run
+# fat jar -> build/libs/, needs JDK 21
 ./gradlew shadowJar
 ```
-
-The jar reads the same settings from the environment, or from a `.env` in the directory it is
-started from.
