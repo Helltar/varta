@@ -70,10 +70,17 @@ inside the watched containers, and nothing about them changes.
 
 ## Build from source
 
+Only needed to change Varta or to run an image of your own; running it takes none of this.
+
 ```bash
-# container image
+git clone https://github.com/Helltar/varta.git && cd varta
+
+# container image; to run it, point `image:` in compose.yaml at `varta`
 docker build -t varta .
 
-# fat jar -> build/libs/
+# or a fat jar in build/libs/, which needs JDK 21 to build and to run
 ./gradlew shadowJar
 ```
+
+The jar reads the same settings from the environment, or from a `.env` in the directory it is
+started from.

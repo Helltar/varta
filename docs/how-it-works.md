@@ -119,8 +119,8 @@ name is cosmetic, unlike an unreadable socket, which stops Varta at startup.
 ## Docker socket access
 
 Varta supports Docker Engine API 1.24–1.55 and negotiates the highest version supported by both sides.
-It lists the stack once, then inspects each watched running container for its authoritative health
-state. Every request is a `GET`; Varta never changes anything through the daemon. The `:ro`
+It lists the stack once, then inspects each watched container that is running or restarting: that
+is where its authoritative health state and its restart count come from. Every request is a `GET`; Varta never changes anything through the daemon. The `:ro`
 mount prevents changes to the socket file itself, but it does not make the Docker API read-only.
 Treat access to the socket as root-level access to the host.
 
@@ -133,7 +133,9 @@ proxies.
 ## Varta's own healthcheck
 
 After every successful Docker read, Varta refreshes `/tmp/health`. Its own `HEALTHCHECK` fails when
-that file gets too old, so `docker ps` shows Varta as unhealthy if it stops polling the daemon.
+that file gets too old, so `docker ps` shows Varta as unhealthy if it stops polling the daemon. The
+file is removed at startup, so one left over from before a restart never vouches for a run that has
+not read the daemon yet.
 
 The default window is deliberately wide. Raise `HEALTH_STALE_SECONDS` when
 `POLL_INTERVAL_SECONDS` is longer than a couple of minutes.
