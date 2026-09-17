@@ -80,18 +80,14 @@ internal class Docker(socket: Path, private val projects: Set<String>, private v
      */
     fun hostname() = json.decodeFromString<DockerInfo>(get("/info")).name.takeIf { it.isNotBlank() }
 
-    fun services(): List<Service> {
-        val summaries =
-            json.decodeFromString<List<ContainerSummary>>(get("/containers/json?all=true"))
-                .filterNot { it.isOneOff() }
-                .map { it to it.toService() }
-                .filter { (_, service) -> service.isWatched() }
-
-        return summaries
-            .map { (summary, _) -> summary.toService(summary.health()) }
+    fun services(): List<Service> =
+        json.decodeFromString<List<ContainerSummary>>(get("/containers/json?all=true"))
+            .filterNot { it.isOneOff() }
+            // decided from the list alone, so nothing is spent inspecting a container nobody asked about
+            .filter { it.toService().isWatched() }
+            .map { it.toService(it.health()) }
             .withDistinctDisplayNames()
             .sortedWith(compareBy({ it.project.orEmpty() }, { it.name }))
-    }
 
     private fun ContainerSummary.health(): ContainerHealth? {
         if (!state.equals("running", ignoreCase = true)) return null
