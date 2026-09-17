@@ -59,6 +59,9 @@ internal class ReportDeliveryQueue(
     private var retryDelayMillis = initialRetryDelayMillis
     private var nextAttemptMillis = 0L
 
+    // whether the report at the head has been written to the log yet
+    private var headLogged = false
+
     internal val pendingCount get() = pending.size
 
     fun enqueue(reports: Iterable<String>) {
@@ -67,6 +70,7 @@ internal class ReportDeliveryQueue(
         reports.forEach { report ->
             if (pending.size == MAX_PENDING_REPORTS) {
                 val dropped = pending.removeFirst()
+                headLogged = false
                 log.warn { "Report delivery queue is full, dropping its oldest report:\n$dropped" }
             }
 
@@ -79,13 +83,24 @@ internal class ReportDeliveryQueue(
         if (pending.isEmpty() || nowMillis() < nextAttemptMillis) return
 
         while (pending.isNotEmpty()) {
-            if (!send(pending.first())) {
+            val report = pending.first()
+
+            if (!send(report)) {
+                // an undelivered report is the one piece of information nobody else holds, so it goes
+                // to the log rather than being lost to an unreachable telegram — once, not again on
+                // every retry of a long outage
+                if (!headLogged) {
+                    headLogged = true
+                    log.warn { "Report was not delivered, keeping it here instead:\n$report" }
+                }
+
                 nextAttemptMillis = nowMillis() + retryDelayMillis
                 retryDelayMillis = minOf(retryDelayMillis * 2, MAX_REPORT_RETRY_DELAY.inWholeMilliseconds)
                 return
             }
 
             pending.removeFirst()
+            headLogged = false
         }
 
         retryDelayMillis = initialRetryDelayMillis
@@ -105,7 +120,7 @@ internal class Watcher(
         heartbeat.clear()
 
         val snapshot = awaitSettled()
-        val delivery = ReportDeliveryQueue(::deliver, pollInterval)
+        val delivery = ReportDeliveryQueue(telegram::send, pollInterval)
 
         log.info { "Reporting on ${snapshot.services.size} services, settled=${snapshot.settled}" }
         delivery.enqueue(listOf(bootReport(snapshot.services, snapshot.settled, host)))
@@ -175,16 +190,6 @@ internal class Watcher(
 
             delivery.flushIfDue()
         }
-    }
-
-    // an undelivered report is the one piece of information nobody else holds, so it goes to the log
-    // rather than being dropped because Telegram happened to be unreachable
-    private fun deliver(text: String): Boolean {
-        val delivered = telegram.send(text)
-
-        if (!delivered) log.warn { "Report was not delivered, keeping it here instead:\n$text" }
-
-        return delivered
     }
 
 }
