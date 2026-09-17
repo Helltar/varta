@@ -1,7 +1,8 @@
 # How Varta works
 
 When Varta starts, it reads the watched containers from Docker and waits for them to stop starting or
-restarting. It sends one boot report, then polls quietly and reports only settled state changes.
+restarting. It sends one boot report, then polls quietly and reports only settled state changes and
+crash loops.
 
 ## Boot report
 
@@ -34,6 +35,9 @@ unit, cron job or host agent.
 
 If the watched services do not settle within `SETTLE_TIMEOUT_SECONDS`, Varta reports them anyway. The
 header says `Still starting` instead of claiming that the stack is healthy.
+
+If nothing matches `PROJECTS` and `IGNORE`, the report says `No containers to watch` once the settle
+timeout has passed.
 
 If the roll call is too long for Telegram, Varta drops the healthy and unverified rows, keeps as many
 problem rows as fit and says how many were omitted.
@@ -87,6 +91,9 @@ have gone on for `SETTLE_TIMEOUT_SECONDS` — the same allowance a booting stack
 crashes a few times while its database comes up is not called broken. The loop is reported once. When
 the service has then stayed up for the same length of time, Varta reports its recovery. A container
 that runs for longer than that between crashes is not recognised as looping.
+
+A service already looping when Varta starts is in the boot report as 🕓 or 🔄 — or as ⚪, without a
+healthcheck — and the 💥 message follows it.
 
 A newly discovered healthy service is also quiet; a newly discovered broken service is reported.
 Removing a container does not produce a change message. Restart Varta whenever a deploy should produce
@@ -142,5 +149,7 @@ The default window is deliberately wide. Raise `HEALTH_STALE_SECONDS` when
 
 ## If Telegram delivery fails
 
-An undelivered report is written in full to the Varta log at `WARN`, kept in memory and retried with
-exponential backoff. Read the log with `docker logs varta` or the equivalent Compose command.
+An undelivered report is written in full to the Varta log at `WARN` — once, not on every retry — kept
+in memory and retried with exponential backoff, up to five minutes between attempts. Reports made in
+the meantime wait behind it, in order, and are logged the same way; at most 100 wait at a time, after
+which the oldest is dropped. Read the log with `docker logs varta` or the equivalent Compose command.
