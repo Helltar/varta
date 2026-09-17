@@ -95,6 +95,7 @@ private fun verb(from: ServiceState?, to: ServiceState) =
         ServiceState.HEALTHY if from?.wrong == true -> "healthy again"
         ServiceState.HEALTHY -> "healthy"
         ServiceState.UNHEALTHY -> "unhealthy"
+        ServiceState.CRASH_LOOPING -> "restarting repeatedly"
         ServiceState.STOPPED -> "stopped"
         ServiceState.UNMEASURED -> "running, no healthcheck"
         else -> to.name.lowercase()

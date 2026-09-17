@@ -45,6 +45,7 @@ problem rows as fit and says how many were omitted.
 | ✅ | running, healthcheck passes |
 | ⚪ | running, no healthcheck |
 | ❌ | running, healthcheck fails |
+| 💥 | keeps restarting — a crash loop |
 | ⛔ | not running |
 | 🕓 | healthcheck is still starting |
 | 🔄 | container is restarting |
@@ -69,6 +70,23 @@ Up 3 hours (unhealthy)
 
 Starting and restarting are treated as states a container is only passing through. An ordinary
 restart therefore produces no message if the service ends in the same state where it began.
+
+A crash loop is the exception, because a container that keeps dying under a restart policy never
+leaves those states and would otherwise stay silent forever. Varta follows Docker's restart count
+instead:
+
+```text
+🖥 atlas
+
+💥 vusan — restarting repeatedly
+restarted 9 times in 6m
+```
+
+A service is reported as looping once it has been restarted at least three times and the restarts
+have gone on for `SETTLE_TIMEOUT_SECONDS` — the same allowance a booting stack gets, so a service that
+crashes a few times while its database comes up is not called broken. The loop is reported once. When
+the service has then stayed up for the same length of time, Varta reports its recovery. A container
+that runs for longer than that between crashes is not recognised as looping.
 
 A newly discovered healthy service is also quiet; a newly discovered broken service is reported.
 Removing a container does not produce a change message. Restart Varta whenever a deploy should produce

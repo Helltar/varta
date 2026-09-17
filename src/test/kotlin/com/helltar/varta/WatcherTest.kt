@@ -56,6 +56,19 @@ class WatcherTest {
     }
 
     @Test
+    fun `a crash loop is announced once and stays quiet while it goes on`() {
+        val before = listOf(service("vusan"))
+        val looping = listOf(service("vusan", ServiceState.CRASH_LOOPING))
+        val observed = observed(before).toMutableMap()
+
+        val change = observeChanges(observed, looping).single()
+
+        assertEquals(ServiceState.HEALTHY, change.from)
+        assertEquals(ServiceState.CRASH_LOOPING, change.service.state)
+        assertTrue(observeChanges(observed, looping).isEmpty())
+    }
+
+    @Test
     fun `a service appearing healthy for the first time is not news`() {
         assertTrue(changesSince(emptyMap(), listOf(service("newcomer"))).isEmpty())
     }

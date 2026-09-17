@@ -85,16 +85,19 @@ internal class Docker(socket: Path, private val projects: Set<String>, private v
             .filterNot { it.isOneOff() }
             // decided from the list alone, so nothing is spent inspecting a container nobody asked about
             .filter { it.toService().isWatched() }
-            .map { it.toService(it.health()) }
+            .map { it.toService(it.details()) }
             .withDistinctDisplayNames()
             .sortedWith(compareBy({ it.project.orEmpty() }, { it.name }))
 
-    private fun ContainerSummary.health(): ContainerHealth? {
-        if (!state.equals("running", ignoreCase = true)) return null
+    // a restarting container is inspected as well: it has no health worth reading, but its restart
+    // count is how a crash loop is told from a restart
+    private fun ContainerSummary.details(): ContainerDetails? {
+        val inspected = state.equals("running", ignoreCase = true) || state.equals("restarting", ignoreCase = true)
+        if (!inspected) return null
 
-        require(id.isNotBlank()) { "docker returned a running container without an id" }
+        require(id.isNotBlank()) { "docker returned a $state container without an id" }
 
-        return json.decodeFromString<ContainerDetails>(get("/containers/$id/json")).state.health
+        return json.decodeFromString<ContainerDetails>(get("/containers/$id/json"))
     }
 
     private fun get(path: String) = api.get("/v$apiVersion$path")

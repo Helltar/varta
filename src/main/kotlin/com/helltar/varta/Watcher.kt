@@ -116,6 +116,9 @@ internal class Watcher(
     private val host: String? = null
 ) {
 
+    // a loop is given as long to prove itself as a booting stack is given to settle
+    private val restarts = RestartTracker(patience = settleTimeout)
+
     fun run() {
         heartbeat.clear()
 
@@ -140,7 +143,7 @@ internal class Watcher(
         val deadline = TimeSource.Monotonic.markNow() + settleTimeout
 
         while (true) {
-            val result = runCatching { docker.services() }
+            val result = runCatching { readServices() }
             val services = result.getOrNull()
 
             if (services != null) {
@@ -164,13 +167,17 @@ internal class Watcher(
         }
     }
 
+    // every reading goes through the tracker, including the ones taken while settling, so that a
+    // loop which began during boot is already being counted when watching starts
+    private fun readServices() = restarts.apply(docker.services())
+
     private fun watch(initial: Map<String, ServiceState>, delivery: ReportDeliveryQueue) {
         val observed = initial.toMutableMap()
 
         while (true) {
             Thread.sleep(pollInterval.inWholeMilliseconds)
 
-            val services = runCatching { docker.services() }
+            val services = runCatching { readServices() }
                 .onFailure { log.warn(it) { "Could not read the docker socket" } }
                 .getOrNull()
 

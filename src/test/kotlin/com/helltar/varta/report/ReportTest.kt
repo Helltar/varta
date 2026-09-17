@@ -139,6 +139,31 @@ class ReportTest {
     }
 
     @Test
+    fun `a crash loop says what it is and how long it has gone on`() {
+        val looping = service("vusan", ServiceState.CRASH_LOOPING, "restarted 9 times in 6m")
+        val report = changeReports(listOf(StateChange(looping, from = ServiceState.HEALTHY))).single()
+
+        assertContains(report, "💥 <b>vusan</b> — restarting repeatedly")
+        assertContains(report, "<i>restarted 9 times in 6m</i>")
+    }
+
+    @Test
+    fun `coming out of a crash loop is a recovery`() {
+        val recovered = StateChange(service("vusan"), from = ServiceState.CRASH_LOOPING)
+
+        assertContains(changeReports(listOf(recovered)).single(), "healthy again")
+    }
+
+    @Test
+    fun `a crash loop counts as needing attention in the boot report`() {
+        val services = listOf(service("aibot"), service("vusan", ServiceState.CRASH_LOOPING, "restarted 9 times in 6m"))
+        val report = bootReport(services, settled = true)
+
+        assertContains(report, "1 of 2 needs attention")
+        assertContains(report, "💥 vusan — restarted 9 times in 6m")
+    }
+
+    @Test
     fun `markup in a service name cannot break the message`() {
         val report = bootReport(listOf(service("<b>evil")), settled = true)
 

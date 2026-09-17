@@ -22,9 +22,14 @@ internal data class ContainerSummary(
 @Serializable
 internal data class ContainerHealth(@SerialName("Status") val status: String = "")
 
+/**
+ * What `GET /containers/{id}/json` adds to the list: the health the list cannot be trusted to carry,
+ * and how many times the restart policy has brought the container back.
+ */
 @Serializable
 internal data class ContainerDetails(
-    @SerialName("State") val state: ContainerRuntimeState = ContainerRuntimeState()
+    @SerialName("State") val state: ContainerRuntimeState = ContainerRuntimeState(),
+    @SerialName("RestartCount") val restartCount: Int = 0
 )
 
 @Serializable
@@ -46,6 +51,11 @@ internal enum class ServiceState(val glyph: String) {
     UNMEASURED("⚪"),
 
     UNHEALTHY("❌"),
+
+    // never read off a single container: it is what `RestartTracker` makes of a service that keeps
+    // coming back, which one reading cannot tell from an ordinary restart
+    CRASH_LOOPING("💥"),
+
     STOPPED("⛔"),
     STARTING("🕓"),
     RESTARTING("🔄");
@@ -53,7 +63,7 @@ internal enum class ServiceState(val glyph: String) {
     /** Whether this state is one the stack can be expected to stay in, rather than pass through. */
     val settled get() = this != STARTING && this != RESTARTING
 
-    val wrong get() = this == UNHEALTHY || this == STOPPED
+    val wrong get() = this == UNHEALTHY || this == CRASH_LOOPING || this == STOPPED
 }
 
 internal data class Service(
@@ -61,7 +71,10 @@ internal data class Service(
     val name: String,
     val state: ServiceState,
     val status: String,
-    val containerName: String = name
+    val containerName: String = name,
+
+    // restarts the daemon's restart policy has performed, or null for a container that was not inspected
+    val restartCount: Int? = null
 )
 
 /**
@@ -72,15 +85,16 @@ internal data class Service(
  */
 internal fun ContainerSummary.isOneOff() = labels[COMPOSE_ONEOFF_LABEL].equals("True", ignoreCase = true)
 
-internal fun ContainerSummary.toService(health: ContainerHealth? = null): Service {
+internal fun ContainerSummary.toService(details: ContainerDetails? = null): Service {
     val containerName = names.firstOrNull()?.removePrefix("/").orEmpty()
 
     return Service(
         project = labels[COMPOSE_PROJECT_LABEL],
         name = labels[COMPOSE_SERVICE_LABEL] ?: containerName,
-        state = resolveState(health),
+        state = resolveState(details?.state?.health),
         status = status,
-        containerName = containerName
+        containerName = containerName,
+        restartCount = details?.restartCount
     )
 }
 

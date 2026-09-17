@@ -87,6 +87,41 @@ class DockerApiTest {
     }
 
     @Test
+    fun `a restarting container is inspected too, for its restart count`() {
+        withServer { socket, server ->
+            val received = mutableListOf<String>()
+            val responses =
+                listOf(
+                    """{"ApiVersion":"1.44","MinAPIVersion":"1.24"}""",
+                    """[
+                        {"Id":"abc","Names":["/vusan"],"State":"restarting","Status":"Restarting (1) 2 seconds ago","Labels":{}},
+                        {"Id":"def","Names":["/dozzle"],"State":"exited","Status":"Exited (0) 2 hours ago","Labels":{}}
+                    ]""",
+                    """{"State":{},"RestartCount":7}"""
+                )
+            val worker =
+                thread(name = "docker-api-response-server", isDaemon = true) {
+                    responses.forEach { body ->
+                        server.accept().use { channel ->
+                            received += channel.readRequest()
+                            channel.writeResponse(body)
+                        }
+                    }
+                }
+
+            val services = Docker(socket, emptySet(), emptySet()).services().associateBy { it.name }
+
+            worker.join(1_000)
+            assertEquals(false, worker.isAlive)
+            assertEquals(3, received.size)
+            assertContains(received[2], "GET /v1.44/containers/abc/json HTTP/1.1")
+            assertEquals(ServiceState.RESTARTING, services.getValue("vusan").state)
+            assertEquals(7, services.getValue("vusan").restartCount)
+            assertEquals(null, services.getValue("dozzle").restartCount)
+        }
+    }
+
+    @Test
     fun `the daemon's host name is read from the Name field of docker info`() {
         val json = Json { ignoreUnknownKeys = true }
 

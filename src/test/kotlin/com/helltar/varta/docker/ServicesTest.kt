@@ -100,5 +100,6 @@ class ServicesTest {
             status = "Up 2 minutes"
         )
 
-    private fun ContainerSummary.service(health: String?) = toService(health?.let(::ContainerHealth))
+    private fun ContainerSummary.service(health: String?) =
+        toService(ContainerDetails(ContainerRuntimeState(health?.let(::ContainerHealth))))
 }
