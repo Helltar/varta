@@ -42,6 +42,15 @@ class ServicesTest {
     }
 
     @Test
+    fun `a container that died between the list and the inspect is not called unhealthy`() {
+        // the daemon stamps "unhealthy" on a container the moment it dies, so the list's "running"
+        // next to that health would report a failing healthcheck that never ran
+        val inspected = ContainerRuntimeState(status = "restarting", health = ContainerHealth("unhealthy"))
+
+        assertEquals(ServiceState.RESTARTING, summary("running").toService(ContainerDetails(inspected)).state)
+    }
+
+    @Test
     fun `anything not running is stopped`() {
         assertEquals(ServiceState.STOPPED, summary("exited").service(null).state)
     }
@@ -101,5 +110,5 @@ class ServicesTest {
         )
 
     private fun ContainerSummary.service(health: String?) =
-        toService(ContainerDetails(ContainerRuntimeState(health?.let(::ContainerHealth))))
+        toService(ContainerDetails(ContainerRuntimeState(health = health?.let(::ContainerHealth))))
 }

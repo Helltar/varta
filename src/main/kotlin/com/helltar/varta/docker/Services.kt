@@ -34,6 +34,7 @@ internal data class ContainerDetails(
 
 @Serializable
 internal data class ContainerRuntimeState(
+    @SerialName("Status") val status: String = "",
     @SerialName("Health") val health: ContainerHealth? = null
 )
 
@@ -91,7 +92,7 @@ internal fun ContainerSummary.toService(details: ContainerDetails? = null): Serv
     return Service(
         project = labels[COMPOSE_PROJECT_LABEL],
         name = labels[COMPOSE_SERVICE_LABEL] ?: containerName,
-        state = resolveState(details?.state?.health),
+        state = resolveState(details?.state),
         status = status,
         containerName = containerName,
         restartCount = details?.restartCount
@@ -107,10 +108,17 @@ internal fun List<Service>.withDistinctDisplayNames(): List<Service> {
     }
 }
 
-private fun ContainerSummary.resolveState(health: ContainerHealth?) =
-    when {
-        state.equals("restarting", ignoreCase = true) -> ServiceState.RESTARTING
-        !state.equals("running", ignoreCase = true) -> ServiceState.STOPPED
+private fun ContainerSummary.resolveState(inspected: ContainerRuntimeState?): ServiceState {
+    // the list and the inspect are two readings a moment apart, and a crash-looping container can
+    // die in between. pairing the list's "running" with the "unhealthy" the daemon stamps on a
+    // dead container would report a failing healthcheck that never ran, so once a container has
+    // been inspected its lifecycle state comes from the same snapshot as its health.
+    val lifecycle = inspected?.status?.takeIf { it.isNotBlank() } ?: state
+    val health = inspected?.health
+
+    return when {
+        lifecycle.equals("restarting", ignoreCase = true) -> ServiceState.RESTARTING
+        !lifecycle.equals("running", ignoreCase = true) -> ServiceState.STOPPED
 
         // absent for a container without a healthcheck, and "none" is what podman reports instead
         health == null || health.status.equals("none", ignoreCase = true) -> ServiceState.UNMEASURED
@@ -119,3 +127,4 @@ private fun ContainerSummary.resolveState(health: ContainerHealth?) =
         health.status.equals("unhealthy", ignoreCase = true) -> ServiceState.UNHEALTHY
         else -> ServiceState.STARTING
     }
+}
