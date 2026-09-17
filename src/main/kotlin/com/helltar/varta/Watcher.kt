@@ -49,7 +49,10 @@ internal fun observeChanges(observed: MutableMap<String, ServiceState>, services
 internal class ReportDeliveryQueue(
     private val send: (String) -> Boolean,
     retryDelay: Duration,
-    private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000 }
+    private val nowMillis: () -> Long = { System.nanoTime() / 1_000_000 },
+    private val logUndelivered: (String) -> Unit = { report ->
+        log.warn { "Report was not delivered, keeping it here instead:\n$report" }
+    }
 ) {
 
     private val initialRetryDelayMillis =
@@ -59,8 +62,10 @@ internal class ReportDeliveryQueue(
     private var retryDelayMillis = initialRetryDelayMillis
     private var nextAttemptMillis = 0L
 
-    // whether the report at the head has been written to the log yet
-    private var headLogged = false
+    // whether delivery is failing right now. while it is, every pending report has been written to
+    // the log: an undelivered report is the one piece of information nobody else holds, and one
+    // waiting behind a report that cannot get through would otherwise exist only in memory.
+    private var stalled = false
 
     internal val pendingCount get() = pending.size
 
@@ -70,12 +75,13 @@ internal class ReportDeliveryQueue(
         reports.forEach { report ->
             if (pending.size == MAX_PENDING_REPORTS) {
                 val dropped = pending.removeFirst()
-                headLogged = false
                 log.warn { "Report delivery queue is full, dropping its oldest report:\n$dropped" }
             }
 
             pending.addLast(report)
+            if (stalled) logUndelivered(report)
         }
+
         if (wasEmpty && pending.isNotEmpty()) nextAttemptMillis = nowMillis()
     }
 
@@ -86,12 +92,10 @@ internal class ReportDeliveryQueue(
             val report = pending.first()
 
             if (!send(report)) {
-                // an undelivered report is the one piece of information nobody else holds, so it goes
-                // to the log rather than being lost to an unreachable telegram — once, not again on
-                // every retry of a long outage
-                if (!headLogged) {
-                    headLogged = true
-                    log.warn { "Report was not delivered, keeping it here instead:\n$report" }
+                // once per report, not again on every retry of a long outage
+                if (!stalled) {
+                    stalled = true
+                    pending.forEach(logUndelivered)
                 }
 
                 nextAttemptMillis = nowMillis() + retryDelayMillis
@@ -100,9 +104,9 @@ internal class ReportDeliveryQueue(
             }
 
             pending.removeFirst()
-            headLogged = false
         }
 
+        stalled = false
         retryDelayMillis = initialRetryDelayMillis
     }
 }

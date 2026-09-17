@@ -165,6 +165,41 @@ class WatcherTest {
     }
 
     @Test
+    fun `every report held back by an outage reaches the log once`() {
+        var now = 0L
+        var succeeds = false
+        val logged = mutableListOf<String>()
+        val delivery =
+            ReportDeliveryQueue(
+                send = { succeeds },
+                retryDelay = 1.seconds,
+                nowMillis = { now },
+                logUndelivered = { logged += it }
+            )
+
+        delivery.enqueue(listOf("first", "second"))
+        delivery.flushIfDue()
+
+        // the one behind the head too: it would otherwise exist only in memory
+        assertEquals(listOf("first", "second"), logged)
+
+        delivery.enqueue(listOf("third"))
+        now = 1_000
+        delivery.flushIfDue()
+
+        assertEquals(listOf("first", "second", "third"), logged)
+
+        succeeds = true
+        now = 3_000
+        delivery.flushIfDue()
+        delivery.enqueue(listOf("fourth"))
+        delivery.flushIfDue()
+
+        assertEquals(0, delivery.pendingCount)
+        assertEquals(listOf("first", "second", "third"), logged)
+    }
+
+    @Test
     fun `the delivery queue stays bounded during a long outage`() {
         val delivery = ReportDeliveryQueue(send = { false }, retryDelay = 1.seconds)
 
