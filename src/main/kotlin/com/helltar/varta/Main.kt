@@ -43,7 +43,7 @@ fun main() {
         telegram = Telegram(Config.botToken, Config.chatId),
         settleTimeout = Config.settleTimeout,
         pollInterval = Config.pollInterval,
-        heartbeatFile = Path.of(Config.heartbeatFile),
+        heartbeat = HeartbeatFile(Path.of(Config.heartbeatFile)),
         host = host
     ).run()
 }

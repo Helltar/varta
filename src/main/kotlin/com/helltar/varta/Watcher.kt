@@ -8,9 +8,6 @@ import com.helltar.varta.report.bootReport
 import com.helltar.varta.report.changeReports
 import com.helltar.varta.telegram.Telegram
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.nio.file.Files
-import java.nio.file.Path
-import java.time.Instant
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.minutes
 import kotlin.time.TimeSource
@@ -100,11 +97,13 @@ internal class Watcher(
     private val telegram: Telegram,
     private val settleTimeout: Duration,
     private val pollInterval: Duration,
-    private val heartbeatFile: Path,
+    private val heartbeat: HeartbeatFile,
     private val host: String? = null
 ) {
 
     fun run() {
+        heartbeat.clear()
+
         val snapshot = awaitSettled()
         val delivery = ReportDeliveryQueue(::deliver, pollInterval)
 
@@ -130,7 +129,9 @@ internal class Watcher(
             val services = result.getOrNull()
 
             if (services != null) {
-                markAlive()
+                // refreshed only after the socket actually answered, so the file going stale means
+                // varta stopped watching — the same signal it reads from everything else
+                heartbeat.touch()
 
                 if (services.isNotEmpty() && services.all { it.state.settled }) {
                     return StackSnapshot(services, settled = true)
@@ -159,7 +160,7 @@ internal class Watcher(
                 .getOrNull()
 
             if (services != null) {
-                markAlive()
+                heartbeat.touch()
 
                 val changes = observeChanges(observed, services)
                 if (changes.isNotEmpty()) {
@@ -186,12 +187,6 @@ internal class Watcher(
         return delivered
     }
 
-    // refreshed only after the socket actually answered, so the file going stale means varta stopped
-    // watching — the same signal it reads from everything else
-    private fun markAlive() {
-        runCatching { Files.writeString(heartbeatFile, Instant.now().toString()) }
-            .onFailure { log.warn(it) { "Could not write the heartbeat file=[$heartbeatFile]" } }
-    }
 }
 
 private data class StackSnapshot(val services: List<Service>, val settled: Boolean)
