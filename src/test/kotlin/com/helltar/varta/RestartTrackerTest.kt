@@ -89,7 +89,22 @@ class RestartTrackerTest {
         loop()
 
         assertEquals(ServiceState.CRASH_LOOPING, read(10, ServiceState.RESTARTING, after = 6.minutes).state)
-        assertEquals(ServiceState.CRASH_LOOPING, read(11, ServiceState.UNMEASURED, after = 15.seconds).state)
+
+        // the daemon raises the count when the container dies, not when it comes back, so the
+        // second it is up again shows the same count as the long wait before it
+        assertEquals(ServiceState.CRASH_LOOPING, read(10, ServiceState.UNMEASURED, after = 15.seconds).state)
+        assertEquals(ServiceState.CRASH_LOOPING, read(11, ServiceState.RESTARTING, after = 15.seconds).state)
+    }
+
+    @Test
+    fun `a loop with long waits between restarts is still measured as one`() {
+        read(0)
+        read(3, after = 15.seconds)
+
+        // no further restart yet, but it has been waiting for one all along
+        val looping = read(3, ServiceState.RESTARTING, after = 5.minutes)
+
+        assertEquals(ServiceState.CRASH_LOOPING, looping.state)
     }
 
     @Test

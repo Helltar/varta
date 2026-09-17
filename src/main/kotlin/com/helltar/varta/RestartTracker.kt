@@ -21,9 +21,13 @@ private const val MIN_RESTARTS = 3
  * A service is looping once it has been restarted [MIN_RESTARTS] times or more and its first and
  * latest restart lie at least [patience] apart: the same allowance a booting stack gets to settle,
  * so a service that crashes a few times waiting for a dependency and then stays up is never called
- * broken. It stops looping once it has gone [patience] without another restart, and not while it
- * is waiting to be restarted. Entering on one condition and leaving on a stricter one is what keeps
- * a slow loop from flapping between the two.
+ * broken. It stops looping once it has gone [patience] without a sign of the loop. Entering on one
+ * condition and leaving on a stricter one is what keeps a slow loop from flapping between the two.
+ *
+ * A sign of the loop is the count going up or the container being seen waiting for its next
+ * restart. The count alone is not enough to leave on: the daemon raises it when the container
+ * dies, not when it comes back, and backs off for up to a minute in between — so a container caught
+ * in the second it is up again would look like one that has stayed up since its last restart.
  */
 internal class RestartTracker(
     private val patience: Duration,
@@ -33,12 +37,12 @@ internal class RestartTracker(
     private class Episode(var lastCount: Int) {
         var restarts = 0
         var startedAt: ComparableTimeMark? = null
-        var lastRestartAt: ComparableTimeMark? = null
+        var lastSignAt: ComparableTimeMark? = null
 
         fun end() {
             restarts = 0
             startedAt = null
-            lastRestartAt = null
+            lastSignAt = null
         }
     }
 
@@ -75,30 +79,27 @@ internal class RestartTracker(
             episode.lastCount = count
 
             if (restarts > 0) {
-                val now = timeSource.markNow()
-
-                if (episode.startedAt == null) episode.startedAt = now
+                if (episode.startedAt == null) episode.startedAt = timeSource.markNow()
                 episode.restarts += restarts
-                episode.lastRestartAt = now
             }
+
+            // waiting for the next restart only counts inside an episode: on its own it is what an
+            // ordinary restart looks like too
+            val sign = restarts > 0 || (episode.startedAt != null && service.state == ServiceState.RESTARTING)
+            if (sign) episode.lastSignAt = timeSource.markNow()
         }
 
         val startedAt = episode.startedAt ?: return null
-        val lastRestartAt = episode.lastRestartAt ?: return null
+        val lastSignAt = episode.lastSignAt ?: return null
 
-        // a container the daemon is about to restart again has not come out of anything. the
-        // daemon backs off for up to a minute between attempts, which a short patience would
-        // otherwise mistake for the service staying up.
-        val waitingForRestart = service.state == ServiceState.RESTARTING
-
-        if (lastRestartAt.elapsedNow() >= patience && !waitingForRestart) {
+        if (lastSignAt.elapsedNow() >= patience) {
             episode.end()
             return null
         }
 
-        // measured between restarts rather than up to now, so a burst that stopped long ago does
-        // not turn into a loop merely by being waited out
-        val lasted = lastRestartAt - startedAt
+        // measured between signs rather than up to now, so a burst that stopped long ago does not
+        // turn into a loop merely by being waited out
+        val lasted = lastSignAt - startedAt
 
         return "restarted ${episode.restarts} times in ${lasted.inWholeSeconds.seconds}"
             .takeIf { episode.restarts >= MIN_RESTARTS && lasted >= patience }
