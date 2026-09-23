@@ -30,8 +30,9 @@ socket access.
 
 ## Run it
 
-Varta is made for a Linux host running Docker. It negotiates a compatible Engine API version with the
-daemon (currently 1.24–1.55), and needs a Telegram bot and read access to the Docker socket.
+Varta is made for a Linux host running Docker; the image is built for amd64. It negotiates a
+compatible Engine API version with the daemon (currently 1.24–1.55), and needs a Telegram bot and read
+access to the Docker socket.
 
 Create a bot for Varta with `@BotFather`, then send it `/start`.
 
