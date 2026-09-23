@@ -1,0 +1,48 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    # one pull request per ecosystem per week instead of one per dependency: fewer ci runs, one merge,
+    # and no textual conflict between bumps on adjacent lines of the version catalog. majors stay
+    # outside the group: one can need code changes, which a pull request that also moves every patch
+    # version is the wrong place for.
+    groups:
+      gradle:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      actions:
+        patterns:
+          - "*"
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    ignore:
+      # a gradle major is a build change, not a refresh, and the wrapper has to move with it
+      - dependency-name: gradle
+        update-types:
+          - version-update:semver-major
+    # no update-types here, unlike gradle above: these base images are pinned by digest, and a rebuilt
+    # image keeps its tag, so a refresh carries no semver for a filter to match on.
+    groups:
+      docker:
+        patterns:
+          - "*"
