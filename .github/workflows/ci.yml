@@ -42,17 +42,15 @@ jobs:
   # every architecture the image is published for is built and run against a live daemon on a native
   # runner of its own: an image that was only cross-built is one nobody has seen start.
   test:
-    name: Test and build (${{ matrix.arch }})
-    runs-on: ${{ matrix.runner }}
+    name: Test and build
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+        arch:
+          - amd64
+          - arm64
 
     steps:
       - name: Check out repository
@@ -170,20 +168,20 @@ jobs:
   # together. the builds are not retried like the ones above: if maven central answers 429, re-run
   # the failed jobs.
   build:
-    name: Build image (${{ matrix.arch }})
+    # github appends the arch to the name of a matrix job once it runs. spelled out here, it would stay
+    # unexpanded on every push, where this job is skipped
+    name: Build image
     if: github.event_name == 'release'
     needs:
       - compose
       - test
-    runs-on: ${{ matrix.runner }}
+    runs-on: ${{ matrix.arch == 'arm64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
       matrix:
-        include:
-          - arch: amd64
-            runner: ubuntu-24.04
-          - arch: arm64
-            runner: ubuntu-24.04-arm
+        arch:
+          - amd64
+          - arm64
     permissions:
       contents: read
       packages: write
