@@ -13,6 +13,9 @@ on:
 permissions:
   contents: read
 
+env:
+  IMAGE: ghcr.io/helltar/varta
+
 concurrency:
   # only a pull request may drop an older run: on master every commit gets its own group, so a burst
   # of pushes neither cancels the run in progress nor discards the ones waiting behind it. the event
@@ -22,10 +25,10 @@ concurrency:
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
-  test:
-    name: Test and build
+  compose:
+    name: Check Compose file
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 5
 
     steps:
       - name: Check out repository
@@ -35,6 +38,25 @@ jobs:
       # DOCKER_GID is filled in
       - name: Check Compose file
         run: cp .env.example .env && DOCKER_GID=0 docker compose config --quiet
+
+  # every architecture the image is published for is built and run against a live daemon on a native
+  # runner of its own: an image that was only cross-built is one nobody has seen start.
+  test:
+    name: Test and build (${{ matrix.arch }})
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Java
         uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
@@ -143,26 +165,92 @@ jobs:
         if: always()
         run: docker rm --force varta-ci varta-ci-fixture || true
 
-  # a release ships only after the tests above pass on its own commit. the build is not retried like
-  # the ones above: if maven central answers 429, re-run the failed job.
+  # a release ships only after the tests above pass on its own commit. each architecture is built on
+  # a native runner of its own and pushed by digest alone; `publish` then puts the tags on the two
+  # together. the builds are not retried like the ones above: if maven central answers 429, re-run
+  # the failed jobs.
+  build:
+    name: Build image (${{ matrix.arch }})
+    if: github.event_name == 'release'
+    needs:
+      - compose
+      - test
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 20
+    strategy:
+      matrix:
+        include:
+          - arch: amd64
+            runner: ubuntu-24.04
+          - arch: arm64
+            runner: ubuntu-24.04-arm
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Compute image labels
+        id: metadata
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.IMAGE }}
+
+      - name: Build and push image by digest
+        id: push
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          platforms: linux/${{ matrix.arch }}
+          tags: ${{ env.IMAGE }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          outputs: type=image,push-by-digest=true,name-canonical=true,push=true
+
+      - name: Record digest
+        env:
+          DIGEST: ${{ steps.push.outputs.digest }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/digests"
+          touch "$RUNNER_TEMP/digests/${DIGEST#sha256:}"
+
+      - name: Upload digest
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: digest-${{ matrix.arch }}
+          path: ${{ runner.temp }}/digests/*
+          if-no-files-found: error
+          retention-days: 1
+
   publish:
     name: Publish image
-    if: github.event_name == 'release'
-    needs: test
+    needs: build
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 10
     permissions:
       attestations: write
       contents: read
       id-token: write
       packages: write
 
-    env:
-      IMAGE: ghcr.io/helltar/varta
-
     steps:
-      - name: Check out repository
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Download digests
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          path: ${{ runner.temp }}/digests
+          pattern: digest-*
+          merge-multiple: true
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
@@ -187,15 +275,32 @@ jobs:
             type=semver,pattern={{major}}.{{minor}},enable=${{ github.event.release.prerelease == false }}
             type=raw,value=latest,enable=${{ github.event.release.prerelease == false }}
 
-      - name: Build and push image
-        id: push
-        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.metadata.outputs.tags }}
-          labels: ${{ steps.metadata.outputs.labels }}
+      - name: Tag the multi-platform image
+        working-directory: ${{ runner.temp }}/digests
+        env:
+          METADATA: ${{ steps.metadata.outputs.json }}
+        run: |
+          tags=()
+          while read -r tag; do
+            tags+=(--tag "$tag")
+          done < <(jq -r '.tags[]' <<< "$METADATA")
+
+          sources=()
+          for digest in *; do
+            sources+=("$IMAGE@sha256:$digest")
+          done
+
+          docker buildx imagetools create "${tags[@]}" "${sources[@]}"
+
+      - name: Read image digest
+        id: index
+        env:
+          VERSION: ${{ steps.metadata.outputs.version }}
+        run: |
+          docker buildx imagetools inspect "$IMAGE:$VERSION"
+          digest="$(docker buildx imagetools inspect "$IMAGE:$VERSION" --format '{{json .Manifest}}' | jq -r .digest)"
+          [[ "$digest" == sha256:* ]]
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
 
       # the image gets read access to the host's docker socket, so whoever runs it can check where it
       # was built: gh attestation verify oci://ghcr.io/helltar/varta:<version> -R Helltar/varta
@@ -203,5 +308,5 @@ jobs:
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-name: ${{ env.IMAGE }}
-          subject-digest: ${{ steps.push.outputs.digest }}
+          subject-digest: ${{ steps.index.outputs.digest }}
           push-to-registry: true
