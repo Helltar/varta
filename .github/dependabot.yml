@@ -36,8 +36,9 @@ updates:
       interval: weekly
     open-pull-requests-limit: 5
     ignore:
-      # a gradle major is a build change, not a refresh, and the wrapper has to move with it
-      - dependency-name: gradle
+      # the jdk major is the build's jvm toolchain and the runtime jlink cuts out of it, so a bump here
+      # is a decision, not a refresh
+      - dependency-name: eclipse-temurin
         update-types:
           - version-update:semver-major
     # no update-types here, unlike gradle above: these base images are pinned by digest, and a rebuilt

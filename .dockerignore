@@ -1,7 +1,8 @@
 *
 
 !src
-!gradle/libs.versions.toml
+!gradle
+!gradlew
 !build.gradle.kts
 !gradle.properties
 !settings.gradle.kts
