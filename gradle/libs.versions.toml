@@ -1,10 +1,10 @@
 [versions]
 dotenv-kotlin = "6.5.1"
-kotlin = "2.4.0"
+kotlin = "2.4.20"
 kotlin-logging = "8.0.4"
 kotlinx-serialization = "1.11.0"
-logback = "1.5.27"
-shadow = "9.3.0"
+logback = "1.6.3"
+shadow = "9.6.1"
 
 [libraries]
 dotenv-kotlin = { module = "io.github.cdimascio:dotenv-kotlin", version.ref = "dotenv-kotlin" }
