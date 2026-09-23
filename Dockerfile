@@ -1,6 +1,6 @@
 # base images are pinned by digest, which dependabot refreshes: a tag can be rebuilt between two
 # builds of the same release, a digest cannot
-FROM gradle:9.0.0-jdk21-alpine@sha256:f30921a2af0cca204583cabc319afcc5b7ca701702c19913815f5eef6f834191 AS builder
+FROM gradle:9.7.1-jdk21-alpine@sha256:c5b166bec57ad50776e622b8d3e8db0afc09cba80cfe8b199ab865a3ab04c114 AS builder
 
 WORKDIR /app
 
@@ -18,7 +18,7 @@ COPY src ./src
 RUN gradle --no-daemon shadowJar
 
 
-FROM alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
 WORKDIR /app
 
