@@ -4,6 +4,12 @@
 
 <h1 align="center">Varta</h1>
 
+<p align="center">
+  <a href="https://github.com/Helltar/varta/actions/workflows/ci.yml"><img src="https://github.com/Helltar/varta/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://kotlinlang.org"><img src="https://img.shields.io/badge/dynamic/toml?url=https%3A%2F%2Fraw.githubusercontent.com%2FHelltar%2Fvarta%2Fmaster%2Fgradle%2Flibs.versions.toml&query=%24.versions.kotlin&logo=kotlin&label=kotlin&color=blue" alt="Kotlin"></a>
+  <a href="https://github.com/Helltar/varta/pkgs/container/varta"><img src="https://img.shields.io/badge/ghcr-varta-blue?logo=docker" alt="GHCR"></a>
+</p>
+
 Did the stack come back up? Varta answers that in Telegram — once, after a reboot, without being
 asked. Then it goes quiet, reporting later problems and recoveries without narrating ordinary
 restarts.
