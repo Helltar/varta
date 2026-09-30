@@ -3,7 +3,7 @@ dotenv-kotlin = "6.5.1"
 kotlin = "2.4.20"
 kotlin-logging = "8.0.4"
 kotlinx-serialization = "1.11.0"
-logback = "1.6.3"
+logback = "1.6.4"
 shadow = "9.6.1"
 
 [libraries]
