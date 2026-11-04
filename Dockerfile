@@ -1,6 +1,6 @@
 # base images are pinned by digest, which dependabot refreshes: a tag can be rebuilt between two
 # builds of the same release, a digest cannot
-FROM eclipse-temurin:21-jdk-alpine@sha256:fd52084c35bbac78890d95d57707d31ffc9d7a3324199e89c06be2a9dc71bfa0 AS builder
+FROM eclipse-temurin:21-jdk-alpine@sha256:b78a1d385da875588e21207f07dddf9a1418849971ae857fb24c8f3a7d441a72 AS builder
 
 WORKDIR /app
 
