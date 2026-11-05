@@ -84,10 +84,11 @@ internal fun changeReports(changes: List<StateChange>, host: String? = null): Li
 }
 
 // which machine the report is about. two hosts running the same stack produce messages that are
-// otherwise identical, down to the compose project name.
+// otherwise identical, down to the compose project name. U+FE0F after the computer asks for its emoji
+// presentation: bare, telegram draws it as a narrow text glyph that touches the name.
 private fun hostLine(host: String?) =
     host?.takeIf { it.isNotBlank() }
-        ?.let { "\uD83D\uDDA5 <b>${it.forMessage().escapeHtml()}</b>\n\n" }
+        ?.let { "\uD83D\uDDA5\uFE0F <b>${it.forMessage().escapeHtml()}</b>\n\n" }
         .orEmpty()
 
 private fun verb(from: ServiceState?, to: ServiceState) =

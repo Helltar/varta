@@ -17,7 +17,7 @@ restarts.
 A boot report in Telegram looks like this:
 
 ```text
-🖥 atlas
+🖥️ atlas
 
 ✅ 3 healthy · ⚪ 1 unverified
 

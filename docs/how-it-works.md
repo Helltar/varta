@@ -7,7 +7,7 @@ crash loops.
 ## Boot report
 
 ```text
-🖥 atlas
+🖥️ atlas
 
 ✅ 6 healthy · ⚪ 2 unverified
 
@@ -66,7 +66,7 @@ as later state changes.
 After the boot report, Varta sends a message when a watched service moves between settled states:
 
 ```text
-🖥 atlas
+🖥️ atlas
 
 ❌ dlpbot — unhealthy
 Up 3 hours (unhealthy)
@@ -80,7 +80,7 @@ leaves those states and would otherwise stay silent forever. Varta follows Docke
 instead:
 
 ```text
-🖥 atlas
+🖥️ atlas
 
 💥 vusan — restarting repeatedly
 restarted 9 times in 6m
