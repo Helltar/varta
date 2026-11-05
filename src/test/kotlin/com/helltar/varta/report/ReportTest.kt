@@ -95,7 +95,7 @@ class ReportTest {
     fun `the footer is separated from the roll call by a blank line`() {
         val report = bootReport(listOf(service("nginx", ServiceState.UNMEASURED)), settled = true)
 
-        assertContains(report, "no healthcheck\n\n<i>1 service has no healthcheck")
+        assertContains(report, "no healthcheck\n\n1 service has no healthcheck")
     }
 
     @Test
@@ -140,11 +140,11 @@ class ReportTest {
 
     @Test
     fun `a crash loop says what it is and how long it has gone on`() {
-        val looping = service("vusan", ServiceState.CRASH_LOOPING, "restarted 9 times in 6m")
+        val looping = service("vusan", ServiceState.CRASH_LOOPING, "Restarted 9 times in 6m")
         val report = changeReports(listOf(StateChange(looping, from = ServiceState.HEALTHY))).single()
 
         assertContains(report, "💥 <b>vusan</b> — restarting repeatedly")
-        assertContains(report, "<i>restarted 9 times in 6m</i>")
+        assertContains(report, "\n↳ Restarted 9 times in 6m")
     }
 
     @Test
@@ -163,11 +163,11 @@ class ReportTest {
 
     @Test
     fun `a crash loop counts as needing attention in the boot report`() {
-        val services = listOf(service("aibot"), service("vusan", ServiceState.CRASH_LOOPING, "restarted 9 times in 6m"))
+        val services = listOf(service("aibot"), service("vusan", ServiceState.CRASH_LOOPING, "Restarted 9 times in 6m"))
         val report = bootReport(services, settled = true)
 
         assertContains(report, "1 of 2 needs attention")
-        assertContains(report, "💥 vusan — restarted 9 times in 6m")
+        assertContains(report, "💥 vusan — Restarted 9 times in 6m")
     }
 
     @Test
@@ -186,9 +186,20 @@ class ReportTest {
             )
 
         assertEquals(
-            "❌ <b>dlpbot</b> — unhealthy\n<i>Up 3 hours (unhealthy)</i>",
+            "❌ <b>dlpbot</b> — unhealthy\n↳ Up 3 hours (unhealthy)",
             changeReports(listOf(change)).single()
         )
+    }
+
+    @Test
+    fun `changes sharing a message are separated by a blank line`() {
+        val changes =
+            listOf(
+                StateChange(service("dlpbot", ServiceState.UNHEALTHY, "Up 3 hours (unhealthy)"), ServiceState.HEALTHY),
+                StateChange(service("aibot", ServiceState.STOPPED, "Exited (1) 3 seconds ago"), ServiceState.HEALTHY)
+            )
+
+        assertContains(changeReports(changes).single(), "↳ Up 3 hours (unhealthy)\n\n⛔ <b>aibot</b> — stopped")
     }
 
     @Test

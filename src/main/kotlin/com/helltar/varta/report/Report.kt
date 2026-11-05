@@ -42,8 +42,8 @@ internal fun bootReport(services: List<Service>, settled: Boolean, host: String?
     val footer =
         when (unmeasured) {
             0 -> ""
-            1 -> "\n\n<i>1 service has no healthcheck — it is unverified, not confirmed.</i>"
-            else -> "\n\n<i>$unmeasured services have no healthcheck — they are unverified, not confirmed.</i>"
+            1 -> "\n\n1 service has no healthcheck — it is unverified, not confirmed."
+            else -> "\n\n$unmeasured services have no healthcheck — they are unverified, not confirmed."
         }
 
     val full = header + "\n\n" + rollCall(services) + footer
@@ -54,9 +54,11 @@ internal fun bootReport(services: List<Service>, settled: Boolean, host: String?
 
 /** The messages sent when services move between settled states while varta is watching. */
 internal fun changeReports(changes: List<StateChange>, host: String? = null): List<String> {
+    // the status (docker's, or the restart summary) hangs under its change on a `↳`, the way vusan
+    // marks a note under a line
     val entries = changes.map { (service, from) ->
         "${service.state.glyph} <b>${service.name.forMessage().escapeHtml()}</b> — ${verb(from, service.state)}" +
-                "\n<i>${service.status.forMessage().escapeHtml()}</i>"
+                "\n↳ ${service.status.forMessage().escapeHtml()}"
     }
 
     if (entries.isEmpty()) return emptyList()
@@ -70,7 +72,8 @@ internal fun changeReports(changes: List<StateChange>, host: String? = null): Li
     var current = entries.first()
 
     for (entry in entries.drop(1)) {
-        val combined = "$current\n$entry"
+        // a blank line between changes, so each one reads as its own block
+        val combined = "$current\n\n$entry"
 
         if (combined.length <= budget) current = combined
         else {
@@ -167,8 +170,8 @@ private fun compactBootReport(header: String, wrong: List<Service>, footer: Stri
 private fun omittedProblems(count: Int) =
     when (count) {
         0 -> ""
-        1 -> "<i>1 more problem not shown.</i>"
-        else -> "<i>$count more problems not shown.</i>"
+        1 -> "1 more problem not shown."
+        else -> "$count more problems not shown."
     }
 
 private fun String.forMessage() =

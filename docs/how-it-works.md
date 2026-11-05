@@ -69,7 +69,7 @@ After the boot report, Varta sends a message when a watched service moves betwee
 🖥️ atlas
 
 ❌ dlpbot — unhealthy
-Up 3 hours (unhealthy)
+↳ Up 3 hours (unhealthy)
 ```
 
 Starting and restarting are treated as states a container is only passing through. An ordinary
@@ -83,7 +83,7 @@ instead:
 🖥️ atlas
 
 💥 vusan — restarting repeatedly
-restarted 9 times in 6m
+↳ Restarted 9 times in 6m
 ```
 
 A service is reported as looping once it has been restarted at least three times and the restarts

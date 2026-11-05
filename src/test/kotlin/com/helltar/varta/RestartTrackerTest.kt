@@ -61,7 +61,7 @@ class RestartTrackerTest {
         val looping = read(10, after = 1.minutes)
 
         assertEquals(ServiceState.CRASH_LOOPING, looping.state)
-        assertEquals("restarted 10 times in 5m", looping.status)
+        assertEquals("Restarted 10 times in 5m", looping.status)
     }
 
     @Test

@@ -101,7 +101,7 @@ internal class RestartTracker(
         // turn into a loop merely by being waited out
         val lasted = lastSignAt - startedAt
 
-        return "restarted ${episode.restarts} times in ${lasted.inWholeSeconds.seconds}"
+        return "Restarted ${episode.restarts} times in ${lasted.inWholeSeconds.seconds}"
             .takeIf { episode.restarts >= MIN_RESTARTS && lasted >= patience }
     }
 }
