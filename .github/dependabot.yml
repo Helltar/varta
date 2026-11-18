@@ -3,13 +3,13 @@ updates:
   - package-ecosystem: gradle
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     # the ecosystem's own default is `java`, which says less than the build tool that reads these files
     labels:
       - dependencies
       - gradle
-    # one pull request per ecosystem per week instead of one per dependency: fewer ci runs, one merge,
+    # one pull request per ecosystem per month instead of one per dependency: fewer ci runs, one merge,
     # and no textual conflict between bumps on adjacent lines of the version catalog. majors stay
     # outside the group: one can need code changes, which a pull request that also moves every patch
     # version is the wrong place for.
@@ -24,7 +24,7 @@ updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     groups:
       actions:
@@ -37,7 +37,7 @@ updates:
   - package-ecosystem: docker
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
     open-pull-requests-limit: 5
     ignore:
       # the jdk major is the build's jvm toolchain and the runtime jlink cuts out of it, so a bump here
